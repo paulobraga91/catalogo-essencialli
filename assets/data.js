@@ -237,6 +237,19 @@ export async function atualizarPedido(id, dados) {
   return data;
 }
 
+// Avisa a Meta (API de Conversões) que o pedido virou venda. Só no modo real.
+export async function enviarCompraMeta(id) {
+  if (MODO === 'demo') return { ok: true, demo: true };
+  const c = await cliente();
+  const { data, error } = await c.functions.invoke('enviar-compra', { body: { pedido: id } });
+  if (error) {
+    let detalhe = error.message;
+    try { const j = await error.context.json(); detalhe = j.detalhe || j.erro || detalhe; } catch { /* sem corpo */ }
+    throw new Error(detalhe);
+  }
+  return data;
+}
+
 export async function listarPedidos() {
   if (MODO === 'demo') return ler(K.ped, []);
   const c = await cliente();

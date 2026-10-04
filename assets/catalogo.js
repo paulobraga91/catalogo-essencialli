@@ -1,4 +1,4 @@
-import * as db from './data.js?v=202610041854';
+import * as db from './data.js?v=202610041909';
 
 const $ = s => document.querySelector(s);
 const { esc, moeda, temPreco, temPromo, precoFinal, fotoDe } = db;

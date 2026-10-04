@@ -210,3 +210,4 @@ button.stat:hover { border-color: var(--gold-3); }
 .barra-n { color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .barra-trilho { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--gold-soft); overflow: hidden; }
 .barra-cheia { display: block; height: 100%; border-radius: 4px; background: var(--marca); }
+.meta-ok { font-size: 12px; font-weight: 700; color: #1877f2; }

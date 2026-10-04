@@ -1,4 +1,4 @@
-import * as db from './data.js?v=202610041854';
+import * as db from './data.js?v=202610041909';
 
 const $ = s => document.querySelector(s);
 const { esc, moeda, temPreco, fotoDe } = db;
@@ -399,6 +399,7 @@ async function renderPedidos() {
           <span class="pedido-vend">→ ${esc(p.vendedora_nome || '—')}</span>
           <span class="pedido-tot">${p.total_pecas} peças${p.total_valor ? ` · ${moeda(p.total_valor)}` : ''}</span>
           <span class="status ${s.classe}">${s.rotulo}${p.status === 'vendido' && p.valor_venda ? ` · ${moeda(p.valor_venda)}` : ''}</span>
+          ${p.status === 'vendido' && st.cfg.pixel_id ? (p.compra_enviada_meta ? '<span class="meta-ok">✓ Na Meta</span>' : '<button class="link-acao" data-pedido-acao="meta">Reenviar para a Meta</button>') : ''}
         </div>
         <details><summary>Ver itens</summary>
           <ul>${(p.itens || []).map(i => `<li>${i.qtd}x ${esc(i.nome)}${i.volume ? ' ' + esc(i.volume) : ''}${i.preco ? ` · ${moeda(i.preco)} cada` : ''}</li>`).join('')}</ul>
@@ -431,7 +432,23 @@ async function mudarStatusPedido(id, acao, el) {
     Object.assign(p, await db.atualizarPedido(id, dados));
     toast(acao === 'vendido' ? 'Venda registrada' : acao === 'nao_fechou' ? 'Marcado como não fechou' : 'Voltou para aguardando');
     renderPedidos();
-  } catch (err) { console.error(err); toast('Não foi possível salvar.'); }
+  } catch (err) { console.error(err); toast('Não foi possível salvar.'); return; }
+  if (acao === 'vendido' && st.cfg.pixel_id) enviarParaMeta(id, true);
+}
+
+// A venda vai para a Meta como "Compra"; se falhar, o pedido mostra "Reenviar para a Meta".
+async function enviarParaMeta(id, silencioso = false) {
+  const p = st.pedidos.find(x => x.id === id);
+  try {
+    await db.enviarCompraMeta(id);
+    p.compra_enviada_meta = true;
+    if (!silencioso) toast('Venda enviada para a Meta');
+  } catch (err) {
+    console.error(err);
+    p.compra_enviada_meta = false;
+    toast('A venda foi salva, mas não chegou na Meta. Use "Reenviar para a Meta".');
+  }
+  if (st.aba === 'pedidos') renderPedidos();
 }
 
 // ---------- Relatórios ----------
@@ -659,7 +676,11 @@ function ligarEventos() {
     const per = e.target.closest('[data-periodo]');
     if (per) { st.periodo = per.dataset.periodo; renderRelatorios(); return; }
     const pa = e.target.closest('[data-pedido-acao]');
-    if (pa) { mudarStatusPedido(Number(pa.closest('[data-pedido]').dataset.pedido), pa.dataset.pedidoAcao, pa); return; }
+    if (pa) {
+      const idPed = Number(pa.closest('[data-pedido]').dataset.pedido);
+      if (pa.dataset.pedidoAcao === 'meta') enviarParaMeta(idPed); else mudarStatusPedido(idPed, pa.dataset.pedidoAcao, pa);
+      return;
+    }
     const filtro = e.target.closest('[data-filtro]');
     if (filtro) { st.filtro = filtro.dataset.filtro; renderProdutos(); return; }
     const alvo = e.target.closest('[data-acao]');
