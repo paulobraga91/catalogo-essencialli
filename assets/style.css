@@ -335,3 +335,39 @@ button { cursor: pointer; }
 .detalhe-compartilhar .btn { flex: 1; padding: 10px 12px; font-size: 13px; }
 .btn-linha-whats { border: 1px solid var(--whats); color: var(--whats); background: transparent; }
 .btn-linha-suave { border: 1px solid var(--line); background: transparent; color: var(--ink-2); }
+
+/* ---------- Mais vendidos em destaque ---------- */
+.destaques {
+  position: relative; overflow: hidden;
+  margin: 18px -16px 0; padding: 22px 16px 20px;
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(197, 144, 204, .45) 0%, transparent 55%),
+    linear-gradient(160deg, #4b2c54 0%, var(--noir) 70%);
+  color: var(--creme);
+}
+@media (min-width: 720px) { .destaques { margin: 22px 0 0; padding: 26px 26px 24px; border-radius: 26px; } }
+.destaques-topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.destaques-eyebrow { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--gold-3); }
+.destaques .destaques-titulo { margin: 0; font-size: clamp(26px, 6vw, 34px); color: var(--creme); }
+.faixa-nav { display: none; gap: 8px; }
+@media (min-width: 720px) { .faixa-nav { display: flex; } }
+.faixa-seta {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid rgba(248, 240, 230, .35); background: rgba(248, 240, 230, .08);
+  color: var(--creme); font-size: 22px; line-height: 1;
+}
+.faixa-seta:hover { background: rgba(248, 240, 230, .18); }
+.destaques .faixa { gap: 14px; padding-bottom: 6px; grid-auto-columns: minmax(170px, 46%); }
+@media (min-width: 720px) { .destaques .faixa { grid-auto-columns: 236px; margin: 0; padding-left: 0; padding-right: 0; } }
+.destaques .card {
+  border: 1.5px solid rgba(236, 211, 238, .55);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .28), 0 0 0 4px rgba(236, 211, 238, .08);
+  color: var(--ink);
+}
+.posicao {
+  position: absolute; top: 10px; left: 10px;
+  min-width: 40px; height: 40px; padding: 0 8px; border-radius: 20px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--creme), #ecd3ee); color: var(--noir);
+  font: 400 19px/1 var(--serif); box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
+}

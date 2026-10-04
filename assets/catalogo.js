@@ -123,24 +123,25 @@ function renderDestaques() {
   const lista = st.produtos.filter(p => p.destaque && !p.esgotado).slice(0, db.LIMITE_MAIS_VENDIDOS);
   const mostrar = lista.length > 0 && st.cat === 'Todos' && st.tipo === 'Todos' && !st.busca.trim();
   $('#destaques').hidden = !mostrar;
-  $('#faixa').innerHTML = mostrar ? lista.map(card).join('') : '';
+  $('#faixa').innerHTML = mostrar ? lista.map((p, i) => card(p, i + 1)).join('') : '';
   iniciarRolagem();
 }
 
 // Mais vendidos passam sozinhos a cada 3 s; param quando a pessoa toca ou passa o mouse e voltam depois.
 let timerFaixa, timerRetomar, pausada = false;
+function pausarFaixa(ms = 6000) { pausada = true; clearTimeout(timerRetomar); timerRetomar = setTimeout(() => { pausada = false; }, ms); }
 function iniciarRolagem() {
   clearInterval(timerFaixa);
   const f = $('#faixa');
   if ($('#destaques').hidden || f.children.length < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const pausar = (ms = 6000) => { pausada = true; clearTimeout(timerRetomar); timerRetomar = setTimeout(() => { pausada = false; }, ms); };
+  const pausar = pausarFaixa;
   f.onpointerdown = () => pausar();
   f.onwheel = () => pausar();
   f.onpointerenter = e => { if (e.pointerType === 'mouse') { pausada = true; clearTimeout(timerRetomar); } };
   f.onpointerleave = e => { if (e.pointerType === 'mouse') pausar(1500); };
   timerFaixa = setInterval(() => {
     if (pausada || document.hidden || st.aberto || $('#sacola').classList.contains('aberta')) return;
-    const passo = f.firstElementChild.getBoundingClientRect().width + 12;
+    const passo = f.firstElementChild.getBoundingClientRect().width + 14;
     const noFim = f.scrollLeft + f.clientWidth >= f.scrollWidth - 4;
     f.scrollTo({ left: noFim ? 0 : f.scrollLeft + passo, behavior: 'smooth' });
   }, 3000);
@@ -187,12 +188,12 @@ function controle(p) {
   return `<div class="stepper"><button data-acao="menos" aria-label="Diminuir">−</button><span>${q}</span><button data-acao="mais" aria-label="Aumentar">+</button></div>`;
 }
 
-function card(p) {
+function card(p, posicao) {
   const info = [p.categoria, p.tipo && p.tipo !== 'Perfume' ? p.tipo : '', p.volume].filter(Boolean).join(' · ');
   return `<article class="card ${p.esgotado ? 'is-esgotado' : ''}" data-id="${esc(p.id)}">
     <button class="card-foto" data-acao="ver" aria-label="Ver detalhes de ${esc(p.nome)}">
       <img src="${esc(fotoDe(p))}" alt="${esc(p.nome)}" loading="lazy">
-      <div class="selos">${selos(p)}</div>
+      ${posicao ? `<span class="posicao">${posicao}º</span>` : `<div class="selos">${selos(p)}</div>`}
     </button>
     <div class="card-corpo">
       ${info ? `<p class="card-cat">${esc(info)}</p>` : ''}
@@ -208,7 +209,7 @@ function card(p) {
 function renderGrade() {
   renderDestaques();
   const lista = filtrados();
-  $('#grade').innerHTML = lista.map(card).join('');
+  $('#grade').innerHTML = lista.map(p => card(p)).join('');
   $('#vazio').hidden = lista.length > 0;
   const n = lista.length;
   $('#contagem').textContent = n ? `${n} ${n === 1 ? 'perfume' : 'perfumes'}` : '';
@@ -421,6 +422,13 @@ function ligarEventos() {
   document.addEventListener('click', e => {
     const chip = e.target.closest('[data-cat]');
     if (chip) { st.cat = chip.dataset.cat; renderChips(); renderGrade(); return; }
+    const seta = e.target.closest('[data-seta]');
+    if (seta) {
+      const f = $('#faixa');
+      pausarFaixa();
+      f.scrollBy({ left: Number(seta.dataset.seta) * (f.firstElementChild.getBoundingClientRect().width + 14), behavior: 'smooth' });
+      return;
+    }
     const chipTipo = e.target.closest('[data-tipo]');
     if (chipTipo) { st.tipo = chipTipo.dataset.tipo; renderChips(); renderGrade(); return; }
     if (e.target.closest('[data-fechar]') || e.target === $('#veu') || e.target === $('#modal')) { fecharTudo(); return; }
