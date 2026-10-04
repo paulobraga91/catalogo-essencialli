@@ -196,7 +196,7 @@ function vendedorasAtivas(conf) {
 }
 
 // Registra o pedido e devolve a vendedora da vez (alternância exata, uma para cada).
-export async function registrarPedido({ itens, nome, cidade, pecas, valor }) {
+export async function registrarPedido({ itens, nome, cidade, pecas, valor, fbp = null, fbc = null }) {
   if (MODO === 'demo') {
     const conf = { ...CONFIG_PADRAO, ...ler(K.conf, {}) };
     const ativas = vendedorasAtivas(conf);
@@ -206,15 +206,33 @@ export async function registrarPedido({ itens, nome, cidade, pecas, valor }) {
     const pedidos = ler(K.ped, []);
     pedidos.unshift({
       id: pedidos.length + 1, criado_em: new Date().toISOString(), cliente_nome: nome, cliente_cidade: cidade,
-      itens, total_pecas: pecas, total_valor: valor, vendedora_nome: v.nome, vendedora_telefone: v.telefone
+      itens, total_pecas: pecas, total_valor: valor, vendedora_nome: v.nome, vendedora_telefone: v.telefone,
+      status: 'enviado', valor_venda: null, fechado_em: null, fbp, fbc
     });
     gravar(K.ped, pedidos.slice(0, 300));
-    return { nome: v.nome, telefone: v.telefone };
+    return { nome: v.nome, telefone: v.telefone, pedido: pedidos[0].id };
   }
   const c = await cliente();
   const { data, error } = await c.rpc('registrar_pedido', {
-    p_itens: itens, p_nome: nome, p_cidade: cidade, p_pecas: pecas, p_valor: valor
+    p_itens: itens, p_nome: nome, p_cidade: cidade, p_pecas: pecas, p_valor: valor, p_fbp: fbp, p_fbc: fbc
   });
+  if (error) throw error;
+  return data;
+}
+
+// Equipe marca o pedido como vendido (com o valor final) ou como não fechado.
+export async function atualizarPedido(id, dados) {
+  const campos = {};
+  for (const k of ['status', 'valor_venda', 'fechado_em']) if (k in dados) campos[k] = dados[k];
+  if (MODO === 'demo') {
+    const pedidos = ler(K.ped, []);
+    const i = pedidos.findIndex(p => p.id === id);
+    pedidos[i] = { ...pedidos[i], ...campos };
+    gravar(K.ped, pedidos);
+    return pedidos[i];
+  }
+  const c = await cliente();
+  const { data, error } = await c.from('pedidos').update(campos).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -222,7 +240,7 @@ export async function registrarPedido({ itens, nome, cidade, pecas, valor }) {
 export async function listarPedidos() {
   if (MODO === 'demo') return ler(K.ped, []);
   const c = await cliente();
-  const { data, error } = await c.from('pedidos').select('*').order('criado_em', { ascending: false }).limit(300);
+  const { data, error } = await c.from('pedidos').select('*').order('criado_em', { ascending: false }).limit(2000);
   if (error) throw error;
   return data;
 }

@@ -177,3 +177,36 @@ button.stat:hover { border-color: var(--gold-3); }
 .linha-chaves { align-items: center; }
 .largo-chave, .config .campo.largo { grid-column: 1 / -1; }
 .campo textarea { font-family: inherit; }
+
+/* ---------- Pedidos com status ---------- */
+.pedido { padding: 14px 16px; }
+.pedido-linha { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+.pedido details summary { cursor: pointer; font-size: 12.5px; color: var(--gold-2); font-weight: 700; padding: 8px 0 4px; list-style: none; }
+.pedido details ul { padding-bottom: 6px; }
+.status { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.st-enviado { background: #fff3d6; color: #8a5a00; }
+.st-vendido { background: #e1f2e7; color: var(--ok); }
+.st-nao { background: #f3e5e3; color: var(--danger); }
+.pedido-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-top: 8px; }
+.valor-venda { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.valor-venda input { width: 130px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; }
+.pedido-acoes .btn { width: auto; padding: 10px 16px; }
+.btn-vendido { background: var(--ok); color: #fff; }
+
+/* ---------- Relatórios ---------- */
+.periodos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.stats-rel .stat-n { font-size: 26px; }
+.rel-nota { margin: -6px 0 18px; }
+.rel-grade { display: grid; gap: 14px; }
+@media (min-width: 900px) { .rel-grade { grid-template-columns: 1fr 1fr; } }
+.rel-bloco { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 18px; overflow-x: auto; }
+.rel-bloco h2 { margin: 0 0 12px; font: 400 22px/1 var(--serif); }
+.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tabela th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.tabela td { padding: 9px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.barras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.barras li { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 13px; }
+.barra-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barra-n { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.barra-trilho { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--gold-soft); overflow: hidden; }
+.barra-cheia { display: block; height: 100%; border-radius: 4px; background: var(--marca); }

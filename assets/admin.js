@@ -50,8 +50,10 @@ function trocarAba(aba) {
   $('#abaProdutos').hidden = aba !== 'produtos';
   $('#abaPedidos').hidden = aba !== 'pedidos';
   $('#abaConfig').hidden = aba !== 'config';
+  $('#abaRelatorios').hidden = aba !== 'relatorios';
   if (aba === 'produtos') renderProdutos();
   if (aba === 'pedidos') renderPedidos();
+  if (aba === 'relatorios') renderRelatorios();
   if (aba === 'config') renderConfig();
 }
 
@@ -358,34 +360,150 @@ async function importarLote(arquivos) {
 }
 
 // ---------- Pedidos ----------
+const STATUS = {
+  enviado: { rotulo: 'Aguardando', classe: 'st-enviado' },
+  vendido: { rotulo: 'Vendido', classe: 'st-vendido' },
+  nao_fechou: { rotulo: 'Não fechou', classe: 'st-nao' }
+};
+const dataCurta = iso => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+async function carregarPedidos() {
+  st.pedidos = await db.listarPedidos();
+  return st.pedidos;
+}
+
 async function renderPedidos() {
   const alvo = $('#abaPedidos');
   alvo.innerHTML = '<p class="carregando">Carregando…</p>';
-  try { st.pedidos = await db.listarPedidos(); }
+  try { await carregarPedidos(); }
   catch (err) { console.error(err); alvo.innerHTML = '<p class="erro">Não foi possível carregar os pedidos.</p>'; return; }
-
-  const porVend = {};
-  for (const p of st.pedidos) porVend[p.vendedora_nome || '—'] = (porVend[p.vendedora_nome || '—'] || 0) + 1;
-  const pecas = st.pedidos.reduce((s, p) => s + (p.total_pecas || 0), 0);
-  const data = iso => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  st.filtroPedido = st.filtroPedido || 'enviado';
+  const conta = k => st.pedidos.filter(p => (p.status || 'enviado') === k).length;
+  const lista = st.pedidos.filter(p => st.filtroPedido === 'todos' || (p.status || 'enviado') === st.filtroPedido);
 
   alvo.innerHTML = `
-    <div class="cabecalho"><div><h1>Pedidos</h1><p class="sub">Cada pedido enviado pelo catálogo para o WhatsApp. Confirme o fechamento com a vendedora.</p></div></div>
+    <div class="cabecalho"><div><h1>Pedidos</h1><p class="sub">Cada pedido enviado pelo catálogo para o WhatsApp. Quando a venda fechar (ou não), marque aqui: é isso que alimenta os Relatórios.</p></div></div>
     <div class="stats">
-      <div class="stat"><span class="stat-n">${st.pedidos.length}</span><span class="stat-r">Pedidos enviados</span></div>
-      <div class="stat"><span class="stat-n">${pecas}</span><span class="stat-r">Peças pedidas</span></div>
-      ${Object.entries(porVend).map(([n, q]) => `<div class="stat"><span class="stat-n">${q}</span><span class="stat-r">${esc(n)}</span></div>`).join('')}
+      ${[['enviado', 'Aguardando retorno'], ['vendido', 'Vendidos'], ['nao_fechou', 'Não fecharam'], ['todos', 'Todos']].map(([k, r]) => `
+        <button class="stat ${st.filtroPedido === k ? 'ativo' : ''} ${k === 'enviado' && conta(k) ? 'alerta' : ''}" data-filtro-pedido="${k}">
+          <span class="stat-n">${k === 'todos' ? st.pedidos.length : conta(k)}</span><span class="stat-r">${r}</span>
+        </button>`).join('')}
     </div>
-    <div class="pedidos">${st.pedidos.length ? st.pedidos.map(p => `
-      <details class="pedido">
-        <summary>
-          <span class="pedido-data">${data(p.criado_em)}</span>
+    <div class="pedidos">${lista.length ? lista.map(p => {
+      const s = STATUS[p.status || 'enviado'];
+      return `
+      <div class="pedido" data-pedido="${p.id}">
+        <div class="pedido-linha">
+          <span class="pedido-data">${dataCurta(p.criado_em)}</span>
           <span class="pedido-cliente"><b>${esc(p.cliente_nome)}</b>${p.cliente_cidade ? ` · ${esc(p.cliente_cidade)}` : ''}</span>
           <span class="pedido-vend">→ ${esc(p.vendedora_nome || '—')}</span>
           <span class="pedido-tot">${p.total_pecas} peças${p.total_valor ? ` · ${moeda(p.total_valor)}` : ''}</span>
-        </summary>
-        <ul>${(p.itens || []).map(i => `<li>${i.qtd}x ${esc(i.nome)}${i.volume ? ' ' + esc(i.volume) : ''}${i.preco ? ` · ${moeda(i.preco)} cada` : ''}</li>`).join('')}</ul>
-      </details>`).join('') : '<div class="vazio"><p class="vazio-titulo">Nenhum pedido ainda</p><p>Quando alguém finalizar pelo catálogo, aparece aqui.</p></div>'}
+          <span class="status ${s.classe}">${s.rotulo}${p.status === 'vendido' && p.valor_venda ? ` · ${moeda(p.valor_venda)}` : ''}</span>
+        </div>
+        <details><summary>Ver itens</summary>
+          <ul>${(p.itens || []).map(i => `<li>${i.qtd}x ${esc(i.nome)}${i.volume ? ' ' + esc(i.volume) : ''}${i.preco ? ` · ${moeda(i.preco)} cada` : ''}</li>`).join('')}</ul>
+        </details>
+        <div class="pedido-acoes">
+          ${p.status === 'vendido' || p.status === 'nao_fechou'
+            ? `<button class="link-acao" data-pedido-acao="reabrir">Voltar para aguardando</button>`
+            : `<label class="valor-venda">Valor da venda (R$)<input inputmode="decimal" value="${p.total_valor ? Number(p.total_valor).toFixed(2).replace('.', ',') : ''}" placeholder="0,00"></label>
+               <button class="btn btn-vendido" data-pedido-acao="vendido">✓ Vendido</button>
+               <button class="btn btn-linha" data-pedido-acao="nao_fechou">Não fechou</button>`}
+        </div>
+      </div>`;
+    }).join('') : '<div class="vazio"><p class="vazio-titulo">Nenhum pedido aqui</p><p>Quando alguém finalizar pelo catálogo, aparece em "Aguardando retorno".</p></div>'}
+    </div>`;
+}
+
+async function mudarStatusPedido(id, acao, el) {
+  const p = st.pedidos.find(x => x.id === id);
+  let dados;
+  if (acao === 'vendido') {
+    const valor = lerPreco(el.closest('.pedido').querySelector('.valor-venda input')?.value);
+    if (!valor) { toast('Digite o valor da venda'); return; }
+    dados = { status: 'vendido', valor_venda: valor, fechado_em: new Date().toISOString() };
+  } else if (acao === 'nao_fechou') {
+    dados = { status: 'nao_fechou', valor_venda: null, fechado_em: new Date().toISOString() };
+  } else {
+    dados = { status: 'enviado', valor_venda: null, fechado_em: null };
+  }
+  try {
+    Object.assign(p, await db.atualizarPedido(id, dados));
+    toast(acao === 'vendido' ? 'Venda registrada' : acao === 'nao_fechou' ? 'Marcado como não fechou' : 'Voltou para aguardando');
+    renderPedidos();
+  } catch (err) { console.error(err); toast('Não foi possível salvar.'); }
+}
+
+// ---------- Relatórios ----------
+const PERIODOS = [['hoje', 'Hoje'], ['7', '7 dias'], ['30', '30 dias'], ['mes', 'Este mês'], ['tudo', 'Tudo']];
+function inicioPeriodo(k) {
+  const d = new Date();
+  if (k === 'hoje') { d.setHours(0, 0, 0, 0); return d; }
+  if (k === 'mes') return new Date(d.getFullYear(), d.getMonth(), 1);
+  if (k === 'tudo') return new Date(0);
+  d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (Number(k) - 1)); return d;
+}
+
+async function renderRelatorios() {
+  const alvo = $('#abaRelatorios');
+  alvo.innerHTML = '<p class="carregando">Carregando…</p>';
+  try { await carregarPedidos(); }
+  catch (err) { console.error(err); alvo.innerHTML = '<p class="erro">Não foi possível carregar os relatórios.</p>'; return; }
+  st.periodo = st.periodo || '30';
+  const ini = inicioPeriodo(st.periodo);
+  const peds = st.pedidos.filter(p => new Date(p.criado_em) >= ini);
+  const vend = peds.filter(p => p.status === 'vendido');
+  const decididos = peds.filter(p => p.status === 'vendido' || p.status === 'nao_fechou').length;
+  const fat = vend.reduce((s, p) => s + Number(p.valor_venda || 0), 0);
+  const pct = n => decididos ? Math.round(n / decididos * 100) + '%' : '—';
+
+  const porVend = {};
+  for (const p of peds) {
+    const k = p.vendedora_nome || '—';
+    const o = porVend[k] ||= { pedidos: 0, vendidos: 0, nao: 0, fat: 0 };
+    o.pedidos++;
+    if (p.status === 'vendido') { o.vendidos++; o.fat += Number(p.valor_venda || 0); }
+    if (p.status === 'nao_fechou') o.nao++;
+  }
+  const porProd = {};
+  for (const p of peds) for (const i of p.itens || []) {
+    const o = porProd[i.nome] ||= { pedidas: 0, vendidas: 0 };
+    o.pedidas += i.qtd;
+    if (p.status === 'vendido') o.vendidas += i.qtd;
+  }
+  const topProd = Object.entries(porProd).sort((a, b) => b[1].pedidas - a[1].pedidas).slice(0, 10);
+  const maxProd = topProd[0]?.[1].pedidas || 1;
+
+  alvo.innerHTML = `
+    <div class="cabecalho"><div><h1>Relatórios</h1><p class="sub">Pedidos que chegaram pelo catálogo e quantos viraram venda. A venda conta quando alguém marca "Vendido" na aba Pedidos.</p></div></div>
+    <div class="periodos">${PERIODOS.map(([k, r]) => `<button class="chip ${st.periodo === k ? 'ativo' : ''}" data-periodo="${k}">${r}</button>`).join('')}</div>
+    <div class="stats stats-rel">
+      <div class="stat"><span class="stat-n">${peds.length}</span><span class="stat-r">Pedidos enviados</span></div>
+      <div class="stat"><span class="stat-n">${vend.length}</span><span class="stat-r">Vendas fechadas</span></div>
+      <div class="stat"><span class="stat-n">${pct(vend.length)}</span><span class="stat-r">Taxa de fechamento</span></div>
+      <div class="stat"><span class="stat-n">${moeda(fat)}</span><span class="stat-r">Faturamento</span></div>
+      <div class="stat"><span class="stat-n">${vend.length ? moeda(fat / vend.length) : '—'}</span><span class="stat-r">Ticket médio</span></div>
+      <div class="stat ${peds.filter(p => (p.status || 'enviado') === 'enviado').length ? 'alerta' : ''}"><span class="stat-n">${peds.filter(p => (p.status || 'enviado') === 'enviado').length}</span><span class="stat-r">Sem retorno ainda</span></div>
+    </div>
+    <p class="ajuda rel-nota">Taxa de fechamento = vendidos ÷ (vendidos + não fecharam). Pedidos ainda aguardando retorno não entram na conta.</p>
+
+    <div class="rel-grade">
+      <section class="rel-bloco">
+        <h2>Por vendedora</h2>
+        ${Object.keys(porVend).length ? `<table class="tabela">
+          <thead><tr><th>Vendedora</th><th>Pedidos</th><th>Vendidos</th><th>Fechamento</th><th>Faturamento</th></tr></thead>
+          <tbody>${Object.entries(porVend).sort((a, b) => b[1].fat - a[1].fat).map(([n, o]) => `
+            <tr><td>${esc(n)}</td><td>${o.pedidos}</td><td>${o.vendidos}</td><td>${o.vendidos + o.nao ? Math.round(o.vendidos / (o.vendidos + o.nao) * 100) + '%' : '—'}</td><td>${moeda(o.fat)}</td></tr>`).join('')}
+          </tbody></table>` : '<p class="ajuda">Sem pedidos no período.</p>'}
+      </section>
+      <section class="rel-bloco">
+        <h2>Perfumes mais pedidos</h2>
+        ${topProd.length ? `<ol class="barras">${topProd.map(([n, o]) => `
+          <li><span class="barra-nome">${esc(n)}</span>
+            <span class="barra-n">${o.pedidas} pç${o.vendidas ? ` · ${o.vendidas} vendidas` : ''}</span>
+            <span class="barra-trilho"><span class="barra-cheia" style="width:${Math.round(o.pedidas / maxProd * 100)}%"></span></span></li>`).join('')}
+        </ol>` : '<p class="ajuda">Sem pedidos no período.</p>'}
+      </section>
     </div>`;
 }
 
@@ -536,6 +654,12 @@ function ligarEventos() {
     if (e.target.closest('#btnLote')) { $('#arquivoLote').click(); return; }
     if (e.target.closest('#fotoRemover')) { st.novaFoto = null; $('#fotoPrevia').src = db.frasco(st.editando.nome, st.editando.categoria); $('#fotoRemover').hidden = true; return; }
     if (e.target.closest('#addVend')) { $('#vendedoras').insertAdjacentHTML('beforeend', linhaVendedora()); return; }
+    const fp = e.target.closest('[data-filtro-pedido]');
+    if (fp) { st.filtroPedido = fp.dataset.filtroPedido; renderPedidos(); return; }
+    const per = e.target.closest('[data-periodo]');
+    if (per) { st.periodo = per.dataset.periodo; renderRelatorios(); return; }
+    const pa = e.target.closest('[data-pedido-acao]');
+    if (pa) { mudarStatusPedido(Number(pa.closest('[data-pedido]').dataset.pedido), pa.dataset.pedidoAcao, pa); return; }
     const filtro = e.target.closest('[data-filtro]');
     if (filtro) { st.filtro = filtro.dataset.filtro; renderProdutos(); return; }
     const alvo = e.target.closest('[data-acao]');

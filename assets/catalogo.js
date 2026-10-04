@@ -11,7 +11,21 @@ const st = { produtos: [], porId: new Map(), cfg: { ...db.CONFIG_PADRAO }, sacol
 function lerJSON(k, padrao) { try { return JSON.parse(localStorage.getItem(k)) || padrao; } catch { return padrao; } }
 function gravarJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* navegador sem armazenamento */ } }
 
+// Identificadores da Meta: _fbp (cookie do pixel) e fbclid (quem chegou por anúncio).
+function guardarClique() {
+  const fbclid = new URLSearchParams(location.search).get('fbclid');
+  if (fbclid) gravarJSON('ess_fbc', `fb.1.${Date.now()}.${fbclid}`);
+}
+function cookie(nome) {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + nome + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function idsMeta() {
+  return { fbp: cookie('_fbp'), fbc: cookie('_fbc') || lerJSON('ess_fbc', null) };
+}
+
 async function iniciar() {
+  guardarClique();
   if (db.MODO === 'demo') $('#demo').hidden = false;
   ligarEventos();
   try {
@@ -345,7 +359,7 @@ async function finalizar(e) {
   const itens = t.itens.map(({ p, q }) => ({ id: p.id, nome: p.nome, volume: p.volume || '', qtd: q, preco: precoFinal(p) }));
   let vend;
   try {
-    vend = await db.registrarPedido({ itens, nome, cidade, pecas: t.pecas, valor: t.valor });
+    vend = await db.registrarPedido({ itens, nome, cidade, pecas: t.pecas, valor: t.valor, ...idsMeta() });
   } catch (err) {
     console.error(err);
     const ativas = vendedorasAtivas();
@@ -355,7 +369,7 @@ async function finalizar(e) {
     currency: 'BRL', value: t.valor, num_items: t.pecas, content_type: 'product',
     content_ids: t.itens.map(i => i.p.id),
     contents: t.itens.map(i => ({ id: i.p.id, quantity: i.q, item_price: precoFinal(i.p) || 0 }))
-  });
+  }, vend.pedido ? { eventID: `pedido-${vend.pedido}` } : undefined);
 
   const url = `https://wa.me/${telefoneWhats(vend.telefone)}?text=${encodeURIComponent(montarMensagem(t, nome, cidade))}`;
   st.sacola = {};
@@ -472,8 +486,8 @@ function iniciarPixel() {
   window.fbq('init', id);
   window.fbq('track', 'PageView');
 }
-function pixel(evento, dados) {
-  if (window.fbq) window.fbq('track', evento, dados);
+function pixel(evento, dados, opcoes) {
+  if (window.fbq) window.fbq('track', evento, dados, opcoes);
 }
 
 iniciar();
